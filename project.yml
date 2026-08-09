@@ -1,0 +1,67 @@
+name: ZendureCloud
+options:
+  bundleIdPrefix: fr.lauriat
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.1
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: KFLACS69T9
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  ZendureCloud:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+      - Assets.xcassets
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: ZendureCloud
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        LSUIElement: false
+        NSHumanReadableCopyright: "© 2026 Vincent Lauriat"
+        SUFeedURL: https://raw.githubusercontent.com/vincentlauriat/ZendureCloud/main/appcast.xml
+        SUPublicEDKey: UZcpP63z7WAvLX3DlbSK7Vgv7GoF42PNjG7Lgrrb2uc=
+        SUEnableInstallerLauncherService: true
+    entitlements:
+      path: ZendureCloud.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.keychain-access-groups: []
+        # Sparkle 2 en app sandboxée : accès aux services XPC de l'updater
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - fr.lauriat.ZendureCloud-spks
+          - fr.lauriat.ZendureCloud-spki
+    dependencies:
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.lauriat.ZendureCloud
+        ENABLE_HARDENED_RUNTIME: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  ZendureCloudTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: ZendureCloud

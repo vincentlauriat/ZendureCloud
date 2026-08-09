@@ -1,0 +1,27 @@
+# Doc de session (règle DevApps)
+COMMANDS.md
+MEMORY.md
+CHANGES.md
+TODOS.md
+PLAN.md
+
+# Xcode / build
+*.xcodeproj
+build/
+DerivedData/
+release/
+*.dmg
+*.zip
+
+# macOS
+.DS_Store
+
+# Secrets
+*.secret
+Secrets.plist
+
+# Sparkle CLI tools (fetched by Scripts/release.sh)
+.sparkle-tools/
+
+# OMC session state
+.omc/
