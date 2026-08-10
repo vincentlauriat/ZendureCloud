@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DeviceCardKind: String {
-    case overview, power, packs, info, raw
+    case overview, power, energy, packs, info, raw
 }
 
 /// Dispatcher : une carte d'un type donné pour un appareil donné.
@@ -17,6 +17,7 @@ struct DeviceCardView: View {
         switch kind {
         case .overview: OverviewCard(device: device, state: state)
         case .power: PowerCard(device: device, state: state, history: history)
+        case .energy: EnergyCard(device: device, state: state)
         case .packs: PacksCard(device: device, state: state)
         case .info: InfoCard(device: device, state: state)
         case .raw: RawPropertiesCard(device: device, state: state)
@@ -52,6 +53,13 @@ private struct OverviewCard: View {
                     }
                     if let temp = state.deviceTemperature {
                         LegendRow(color: .red, label: "Température", value: Format.temperature(temp))
+                    }
+                    if let available = state.availableKwh, let total = state.totalCapacityKwh {
+                        LegendRow(color: .blue, label: "Disponible",
+                                  value: "\(Format.wattHours(available * 1000)) / \(Format.wattHours(total * 1000))")
+                    }
+                    if state.remainOutMinutes == nil, let estimated = state.estimatedRemainMinutes {
+                        LegendRow(color: .orange, label: "Autonomie (est.)", value: Format.minutes(estimated))
                     }
                 }
             }
@@ -147,6 +155,60 @@ private struct PowerCard: View {
     }
 }
 
+// MARK: - Énergie cumulée (session)
+
+/// Compteurs d'énergie intégrés localement (puissance × temps entre deux
+/// rapports), comme les capteurs `aggr*` de Zendure-HA — remis à zéro au
+/// lancement de l'app.
+private struct EnergyCard: View {
+    let device: ZendureDevice
+    let state: DeviceState
+
+    var body: some View {
+        MetricCard(title: "Énergie (session)", systemImage: "chart.bar.fill") {
+            VStack(alignment: .leading, spacing: 6) {
+                row("sun.max.fill", .yellow, "Solaire", state.energy.solarWh)
+                row("house.fill", .blue, "Maison", state.energy.homeWh)
+                row("bolt.horizontal.fill", .purple, "Réseau", state.energy.gridWh)
+                row("battery.100percent.bolt", .green, "Charge batterie", state.energy.chargeWh)
+                row("battery.25percent", .orange, "Décharge batterie", state.energy.dischargeWh)
+                if let efficiency = state.energy.roundtripEfficiency {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(.teal)
+                            .font(.caption)
+                            .frame(width: 16)
+                        Text("Efficacité aller-retour")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(String(format: "%.0f %%", efficiency))
+                            .font(.caption.monospacedDigit())
+                    }
+                }
+                Text("Cumuls depuis le lancement de l'app.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func row(_ icon: String, _ color: Color, _ label: LocalizedStringKey, _ wattHours: Double) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .font(.caption)
+                .frame(width: 16)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(Format.wattHours(wattHours))
+                .font(.caption.monospacedDigit())
+        }
+    }
+}
+
 // MARK: - Packs batterie
 
 private struct PacksCard: View {
@@ -169,6 +231,18 @@ private struct PacksCard: View {
                 Text(pack.sn)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
+                if let battery = pack.battery {
+                    Text("\(battery.model) · \(String(format: "%.2f", battery.kwh)) kWh")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                if pack.heatState == 1 {
+                    Image(systemName: "flame.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .help("Chauffage batterie actif")
+                }
                 Spacer()
                 if let soc = pack.socLevel {
                     Text(Format.percent(soc))
@@ -191,6 +265,10 @@ private struct PacksCard: View {
                 }
                 if let current = pack.current {
                     detail("arrow.left.arrow.right", String(format: "%.1f A", current))
+                }
+                if let delta = pack.deltaVoltage {
+                    // Écart cellule haute/basse : > ~50 mV = déséquilibre.
+                    detail("chart.line.flattrend.xyaxis", "Δ \(Int((delta * 1000).rounded())) mV")
                 }
                 Spacer()
             }
@@ -246,6 +324,17 @@ private struct InfoCard: View {
                 if let voltage = state.batteryVoltage {
                     row("Tension batterie", Format.voltage(voltage))
                 }
+                if let passMode = state.passMode {
+                    row("Bypass", bypassLabel(passMode))
+                }
+                if let heat = state.heatState {
+                    row("Chauffage batterie", heat == 1
+                        ? String(localized: "actif")
+                        : String(localized: "inactif"))
+                }
+                if let total = state.totalCapacityKwh {
+                    row("Capacité installée", String(format: "%.2f kWh", total))
+                }
             }
         }
     }
@@ -260,6 +349,16 @@ private struct InfoCard: View {
                 .font(.caption.monospacedDigit())
                 .lineLimit(1)
                 .truncationMode(.middle)
+        }
+    }
+
+    /// Valeurs `passMode` documentées par Zendure-HA.
+    private func bypassLabel(_ mode: Int) -> String {
+        switch mode {
+        case 0: String(localized: "automatique")
+        case 1: String(localized: "toujours inactif")
+        case 2: String(localized: "toujours actif")
+        default: "\(mode)"
         }
     }
 }

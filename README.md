@@ -16,6 +16,9 @@ Native macOS dashboard for the Zendure Cloud — connects to your Zendure accoun
 | Dashboard window — masonry of cards per device | ✅ |
 | SOC circular gauge, power flows (solar/home/grid/battery), sparklines | ✅ |
 | Battery packs detail (per-pack SOC, temperature, voltage, current) | ✅ |
+| Pack identification by serial prefix (model + nominal kWh, à la Zendure-HA) | ✅ |
+| Derived metrics: available kWh, cell ΔV, estimated runtime, bypass state | ✅ |
+| Session energy counters (solar/home/grid/charge/discharge + roundtrip efficiency) | ✅ |
 | **Raw properties browser** — every key the cloud publishes, filterable | ✅ |
 | Menu bar extra (average SOC label + per-device dropdown) | ✅ |
 | Fallback poll `properties/read getAll` (configurable interval) | ✅ |
@@ -41,7 +44,7 @@ The token is stored only in the macOS Keychain (`fr.lauriat.ZendureCloud`).
 ```bash
 xcodegen generate
 xcodebuild -scheme ZendureCloud -configuration Debug build
-xcodebuild -scheme ZendureCloud test        # 19 unit tests
+xcodebuild -scheme ZendureCloud test        # 26 unit tests
 ```
 
 Single external dependency: [Sparkle 2](https://sparkle-project.org) for auto-updates (SPM). Everything else is system frameworks — Network.framework for MQTT, CryptoKit for the SHA1 request signature, Swift Charts for sparklines.
@@ -58,7 +61,8 @@ Sources/
   SafeDelta.swift             protected counter subtraction (from MacInside)
   Models/
     ZendureDevice.swift       deviceList response models
-    DeviceState.swift         merged per-device state + raw properties + packData
+    DeviceState.swift         merged per-device state + raw properties + packData + energy counters
+    BatteryCatalog.swift      pack model/kWh from serial prefix (Zendure-HA mapping)
   Services/
     CloudKey.swift            base64 token → apiUrl + appKey
     ZendureAPI.swift          signed deviceList request (SHA1)

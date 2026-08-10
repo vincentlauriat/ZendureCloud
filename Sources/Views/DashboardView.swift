@@ -84,6 +84,9 @@ struct DashboardView: View {
             .init(device: device, kind: .overview),
             .init(device: device, kind: .power),
         ]
+        if let state, state.energy.hasData {
+            cards.append(.init(device: device, kind: .energy))
+        }
         if let state, !state.packs.isEmpty {
             cards.append(.init(device: device, kind: .packs))
         }

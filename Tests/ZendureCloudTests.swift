@@ -194,6 +194,84 @@ final class DeviceStateTests: XCTestCase {
     }
 }
 
+final class BatteryCatalogTests: XCTestCase {
+    func testSerialPrefixMapping() {
+        // Le discriminant secondaire est le 4e caractère (index 3) du SN.
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "AAAXBB")?.model, "AB1000")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "AAA3BB")?.model, "AIO 2400")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "B12345")?.model, "AB1000S")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "CCCXBB")?.model, "AB2000")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "CCCFBB")?.model, "AB2000S")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "CCCEBB")?.model, "AB2000X")
+        XCTAssertEqual(BatteryCatalog.battery(forSerial: "F12345")?.kwh, 2.88)
+        XCTAssertNil(BatteryCatalog.battery(forSerial: "Z12345"))
+        XCTAssertNil(BatteryCatalog.battery(forSerial: ""))
+    }
+
+    func testDeviceCapacityAndAvailable() {
+        var state = DeviceState()
+        state.merge(payload: [
+            "electricLevel": 60,
+            "minSoc": 10,
+            "packData": [["sn": "CO4AAA"], ["sn": "CO4BBB"]],  // 2 × AB2000 = 3,84 kWh
+        ])
+        XCTAssertEqual(state.totalCapacityKwh!, 3.84, accuracy: 0.001)
+        // (60 − 10) % de 3,84 kWh = 1,92 kWh
+        XCTAssertEqual(state.availableKwh!, 1.92, accuracy: 0.001)
+    }
+
+    func testEstimatedRemainMinutes() {
+        var state = DeviceState()
+        state.merge(payload: [
+            "electricLevel": 60,
+            "minSoc": 10,
+            "packInputPower": 960,  // décharge nette 960 W
+            "packData": [["sn": "CO4AAA"], ["sn": "CO4BBB"]],
+        ])
+        // 1,92 kWh / 960 W = 2 h = 120 min
+        XCTAssertEqual(state.estimatedRemainMinutes, 120)
+        // Pas d'estimation en charge ou à l'arrêt.
+        state.merge(payload: ["packInputPower": 0])
+        XCTAssertNil(state.estimatedRemainMinutes)
+    }
+
+    func testPackDeltaVoltage() {
+        var state = DeviceState()
+        state.merge(payload: ["packData": [["sn": "P1", "maxVol": 334, "minVol": 331]]])
+        XCTAssertEqual(state.packs[0].deltaVoltage!, 0.03, accuracy: 0.001)
+    }
+}
+
+final class EnergyCountersTests: XCTestCase {
+    func testIntegrationBetweenReports() {
+        var state = DeviceState()
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        state.merge(payload: ["solarInputPower": 600, "outputPackPower": 300], at: t0)
+        XCTAssertFalse(state.energy.hasData)  // premier rapport : rien à intégrer
+
+        // 6 minutes plus tard : 600 W × 0,1 h = 60 Wh solaire, 30 Wh charge.
+        state.merge(payload: ["solarInputPower": 400], at: t0.addingTimeInterval(360))
+        XCTAssertEqual(state.energy.solarWh, 60, accuracy: 0.001)
+        XCTAssertEqual(state.energy.chargeWh, 30, accuracy: 0.001)
+    }
+
+    func testLongGapsAreNotIntegrated() {
+        var state = DeviceState()
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        state.merge(payload: ["solarInputPower": 600], at: t0)
+        state.merge(payload: ["solarInputPower": 600], at: t0.addingTimeInterval(3600))
+        XCTAssertEqual(state.energy.solarWh, 0)
+    }
+
+    func testRoundtripEfficiencyNeedsMinimumEnergy() {
+        var counters = EnergyCounters()
+        counters.accumulate(solar: nil, home: nil, grid: nil, charge: 40, discharge: 36, seconds: 3600)
+        XCTAssertNil(counters.roundtripEfficiency)  // < 50 Wh de charge
+        counters.accumulate(solar: nil, home: nil, grid: nil, charge: 60, discharge: 54, seconds: 3600)
+        XCTAssertEqual(counters.roundtripEfficiency!, 90, accuracy: 0.001)
+    }
+}
+
 final class MQTTCredentialsTests: XCTestCase {
     private func creds(_ url: String) -> MQTTCredentials {
         MQTTCredentials(clientId: "c", url: url, username: "u", password: "p")

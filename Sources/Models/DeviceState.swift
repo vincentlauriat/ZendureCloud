@@ -19,6 +19,47 @@ struct PackInfo: Identifiable, Equatable {
     var heatState: Int?
 
     var id: String { sn }
+
+    /// Modèle et capacité déduits du SN (mapping Zendure-HA).
+    var battery: BatteryCatalog.Battery? { BatteryCatalog.battery(forSerial: sn) }
+
+    /// Écart entre cellule haute et cellule basse, en volts — indicateur de
+    /// l'équilibrage (Zendure-HA expose la même donnée sous `deltaVoltage`).
+    var deltaVoltage: Double? {
+        guard let maxVol, let minVol else { return nil }
+        return max(0, maxVol - minVol)
+    }
+}
+
+/// Compteurs d'énergie intégrés dans le temps (méthode Zendure-HA `aggregate` :
+/// puissance × durée entre deux rapports). Cumuls depuis le lancement de l'app.
+struct EnergyCounters: Equatable {
+    var solarWh: Double = 0
+    var homeWh: Double = 0
+    var gridWh: Double = 0
+    var chargeWh: Double = 0
+    var dischargeWh: Double = 0
+
+    /// Efficacité aller-retour batterie (décharge / charge). Pertinente
+    /// seulement après un minimum d'énergie cumulée.
+    var roundtripEfficiency: Double? {
+        guard chargeWh > 50, dischargeWh > 0 else { return nil }
+        return min(100, dischargeWh / chargeWh * 100)
+    }
+
+    var hasData: Bool {
+        solarWh + homeWh + gridWh + chargeWh + dischargeWh > 0
+    }
+
+    mutating func accumulate(solar: Double?, home: Double?, grid: Double?,
+                             charge: Double?, discharge: Double?, seconds: TimeInterval) {
+        let hours = seconds / 3600
+        solarWh += (solar ?? 0) * hours
+        homeWh += (home ?? 0) * hours
+        gridWh += (grid ?? 0) * hours
+        chargeWh += (charge ?? 0) * hours
+        dischargeWh += (discharge ?? 0) * hours
+    }
 }
 
 /// Une propriété brute reçue, avec son horodatage — pour la vue « toutes les
@@ -61,6 +102,11 @@ struct DeviceState: Equatable {
     var packState: Int?
     var packNum: Int?
     var batteryVoltage: Double?      // V
+    var passMode: Int?               // bypass : 0 auto, 1 off, 2 on
+    var heatState: Int?              // chauffage batterie 0/1
+
+    // Énergie cumulée (session)
+    var energy = EnergyCounters()
 
     // Packs
     var packs: [PackInfo] = []
@@ -78,6 +124,18 @@ struct DeviceState: Equatable {
     /// plat selon le firmware.
     mutating func merge(payload root: [String: Any], at date: Date = Date()) {
         let props = (root["properties"] as? [String: Any]) ?? root
+
+        // Intégration énergie AVANT mise à jour : les puissances encore en
+        // mémoire ont été valables pendant l'intervalle écoulé. Les trous
+        // (> 10 min : veille, coupure) ne sont pas intégrés.
+        if let last = lastUpdate {
+            let dt = date.timeIntervalSince(last)
+            if dt > 0 && dt <= 600 {
+                energy.accumulate(solar: solarInputPower, home: outputHomePower,
+                                  grid: gridInputPower, charge: outputPackPower,
+                                  discharge: packInputPower, seconds: dt)
+            }
+        }
 
         for (key, anyValue) in props where !(anyValue is [Any]) && !(anyValue is [String: Any]) {
             rawProperties[key] = RawProperty(key: key, value: Self.describe(anyValue), updatedAt: date)
@@ -103,6 +161,8 @@ struct DeviceState: Equatable {
         if let v = num("packState") { packState = Int(v) }
         if let v = num("packNum") { packNum = Int(v) }
         if let v = num("BatVolt") { batteryVoltage = v / 100 }
+        if let v = num("passMode") { passMode = Int(v) }
+        if let v = num("heatState") { heatState = Int(v) }
         if let v = num("remainOutTime") {
             remainOutMinutes = Int(v) == Self.invalidRemainMinutes ? nil : Int(v)
         }
@@ -201,5 +261,31 @@ struct DeviceState: Equatable {
     /// Propriétés brutes triées pour l'affichage.
     var sortedRawProperties: [RawProperty] {
         rawProperties.values.sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+    }
+
+    // MARK: - Capacité et autonomie dérivées (méthode Zendure-HA)
+
+    /// Capacité nominale totale : somme des capacités des packs identifiés
+    /// par leur SN. nil si aucun pack reconnu.
+    var totalCapacityKwh: Double? {
+        let capacities = packs.compactMap { $0.battery?.kwh }
+        guard !capacities.isEmpty else { return nil }
+        return capacities.reduce(0, +)
+    }
+
+    /// Énergie encore utilisable : capacité × (SOC − SOC min) / 100.
+    var availableKwh: Double? {
+        guard let total = totalCapacityKwh, let level = electricLevel else { return nil }
+        let floor = socMin ?? 0
+        return max(0, total * (level - floor) / 100)
+    }
+
+    /// Autonomie estimée côté app (kWh disponibles / puissance nette de
+    /// décharge) — utile quand le firmware renvoie la sentinelle 59940.
+    var estimatedRemainMinutes: Int? {
+        guard let available = availableKwh else { return nil }
+        let net = (packInputPower ?? 0) - (outputPackPower ?? 0)
+        guard net > 10 else { return nil }
+        return Int(available * 1000 / net * 60)
     }
 }
