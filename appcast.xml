@@ -6,16 +6,16 @@
     <description>ZendureCloud release feed</description>
     <language>en</language>
     <item>
-      <title>v0.3.0</title>
-      <pubDate>Mon, 10 Aug 2026 15:38:15 +0200</pubDate>
-      <sparkle:version>3</sparkle:version>
-      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <title>v0.4.0</title>
+      <pubDate>Mon, 10 Aug 2026 17:34:22 +0200</pubDate>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/vincentlauriat/ZendureCloud/releases/tag/v0.3.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/vincentlauriat/ZendureCloud/releases/tag/v0.4.0</sparkle:releaseNotesLink>
       <enclosure
-        url="https://github.com/vincentlauriat/ZendureCloud/releases/download/v0.3.0/ZendureCloud-0.3.0.dmg"
+        url="https://github.com/vincentlauriat/ZendureCloud/releases/download/v0.4.0/ZendureCloud-0.4.0.dmg"
         type="application/octet-stream"
-        sparkle:edSignature="5yPQpRD4oehKi4JzrbWEpkYQGbzXoXPrb4x/tplasgvauQz5Rmocsfk02AZAU/g8lZyxdVd4ifUi7+pnn5BVAw==" length="1524945" />
+        sparkle:edSignature="zy1fxAPn3cPpV8fqZ1X0wKug04CkrrA/JfdwJzDBxZ/WLA/DWefr+b6eR2xZ10JaKAGeV7CUjyNVA6vYaUVWAA==" length="1668593" />
     </item>
   </channel>
 </rss>
