@@ -6,16 +6,16 @@
     <description>ZendureCloud release feed</description>
     <language>en</language>
     <item>
-      <title>v0.1.0</title>
-      <pubDate>Sun, 09 Aug 2026 12:41:51 +0200</pubDate>
-      <sparkle:version>1</sparkle:version>
-      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <title>v0.2.0</title>
+      <pubDate>Mon, 10 Aug 2026 15:28:09 +0200</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/vincentlauriat/ZendureCloud/releases/tag/v0.1.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/vincentlauriat/ZendureCloud/releases/tag/v0.2.0</sparkle:releaseNotesLink>
       <enclosure
-        url="https://github.com/vincentlauriat/ZendureCloud/releases/download/v0.1.0/ZendureCloud-0.1.0.dmg"
+        url="https://github.com/vincentlauriat/ZendureCloud/releases/download/v0.2.0/ZendureCloud-0.2.0.dmg"
         type="application/octet-stream"
-        sparkle:edSignature="gZu6RVsMGK6EzGYdGSWs9kVM+ndI4AH9MuFBthqpDo+ODwVsBRNTfWVb/VXFzeWqHUiJ30JMcTf58h3MRsINAw==" length="1459037" />
+        sparkle:edSignature="/P3m+y2V2CkXWPf/vN9r6CBXKM81+AO6zpmP9a2cihtjUQQkT1ys18l6SAULhR1E2nZEWp6vHR9fPaxosfbUAw==" length="1485788" />
     </item>
   </channel>
 </rss>
