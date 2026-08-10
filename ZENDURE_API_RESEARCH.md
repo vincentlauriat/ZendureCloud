@@ -337,6 +337,99 @@ le client doit **fusionner** les rapports dans un état persistant, jamais rempl
 
 ---
 
+## Historisation (recherche du 10 août 2026)
+
+> Question : existe-t-il une API d'historique (jusqu'à 365 jours) ? Réponse courte : **oui,
+> mais uniquement via l'API privée de l'app mobile** (login email/mot de passe), pas via le
+> Cloud Key. Aucune API d'historique officielle n'existe.
+
+### Ce qui est exclu
+
+- **Méthode 1 (Cloud Key / `zenHa`)** : `api.py` de Zendure-HA ET `zenWebService.ts` de
+  ioBroker.zendure-solarflow (vérifiés le 2026-08-10, repo actif) confirment que
+  `/api/ha/deviceList` est le SEUL endpoint de cette famille. Pas d'historique possible avec
+  cette auth. ioBroker fabrique d'ailleurs ses statistiques d'énergie **localement**
+  (`calculateEnergy()` toutes les 30 s, remise à zéro à minuit via node-schedule, persistance
+  dans les states ioBroker) — exactement l'approche de nos `EnergyCounters`, avec persistance
+  en plus.
+- **API officielle** : demandes répétées sur le forum Zendure (ex. discussion 26660, « Can we
+  please get an API to retrieve the historic data… not only real-time via MQTT ») **sans
+  réponse de Zendure**. Les utilisateurs se voient conseiller de logger localement.
+
+### Les endpoints d'historique de l'app mobile (API privée, non contractuelle)
+
+Source principale : module FHEM `RP-Develop/Zendure` (actif, dernier push 2025-04), qui les
+utilise en production. Ce sont les endpoints qui alimentent les graphiques jour/semaine/mois/
+année de l'app.
+
+**1. Login** (méthode 3 du présent rapport — donc fonctionnelle en 2025, contrairement au
+statut « non vérifiée » noté en août 2026) :
+
+```http
+POST https://app.zendure.tech/{région}/auth/app/token        # eu, v2 (global), as…
+Authorization: Basic Q29uc3VtZXJBcHA6NX4qUmRuTnJATWg0WjEyMw==
+appVersion: 4.3.1
+User-Agent: Zendure/4.3.1 (iPhone; iOS 14.4.2; Scale/3.00)
+
+{"password":"…","account":"…","appId":"121c83f761305d6cf7e",
+ "appType":"iOS","grantType":"password","tenantId":""}
+```
+
+La réponse fournit `data.accessToken` (→ en-tête `Blade-Auth: bearer <token>`), et surtout
+**`data.serverNodeUrl`** — le nœud régional de données qui héberge les endpoints tdengine —
+plus `iotUrl`/`iotUserName` (MQTT compte entier) et `zone`.
+
+**2. Historique** (TDengine = base de séries temporelles côté Zendure) :
+
+```http
+POST {serverNodeUrl}/tdengine/device/solarFlow/energy      # énergies agrégées (kWh)
+POST {serverNodeUrl}/tdengine/device/solarFlow/electric    # courbes de puissance
+Blade-Auth: bearer <accessToken>
+
+{"aceId":"", "deviceId":"<deviceId>", "beginDate":"2026-08-10",
+ "endDate":"2026-08-10", "zone":"Europe/Paris", "type":0}
+```
+
+- `type: 0` + `beginDate = endDate = jour` → données du jour.
+- `type: ""` + dates vides → totaux sur toute la vie de l'appareil.
+- Les autres valeurs de `type` (vraisemblablement semaine/mois/année, vu les onglets de
+  l'app) **restent à découvrir par sondage réel** — FHEM n'utilise que 0 et "".
+- Champs de réponse observés : `solar`, `home`, `batteryInput`, `batteryOutput`,
+  `gridInputTotal`, `acOutputTotal`, `dcOutputTotal`, `socketOutputTotal`, `gridDirectTotal`,
+  `outputToInverse`, `outputToBindDevice`, `bindDeviceInput` (sous-ensembles selon
+  productType : Hub 2000 = 4 champs, Hyper 2000 = 5).
+- La réponse contient aussi **`energyVos` et `data`** : les séries temporelles des graphiques
+  (FHEM les supprime avant stockage — `#Diagrammdaten gelöscht` — mais elles sont bien
+  renvoyées). C'est là que se trouve la granularité fine.
+
+**3. Annexes** : `{serverNodeUrl}/device/solarFlow/detail` (`{"deviceId":…}`) et
+`https://app.zendure.tech/{région}/platform/h5/time`.
+
+### Sur les 365 jours
+
+L'app affiche une vue « année », donc la rétention côté Zendure est d'au moins un an. Deux
+stratégies : itérer 365 appels `type:0` jour par jour (lourd mais sûr), ou identifier la
+valeur de `type` « année » qui renvoie 12 points mensuels (à sonder). La profondeur réelle de
+rétention (> 1 an ?) n'est documentée nulle part.
+
+### Implémentation éventuelle dans ZendureCloud
+
+1. Second mode d'auth **optionnel** (email/mot de passe → Keychain), service isolé du chemin
+   Cloud Key — l'API app est encore moins contractuelle que le reste.
+2. Sonder `type` 0/1/2/3/4 sur un jour/mois/an pour cartographier les granularités et le
+   contenu d'`energyVos` (la console MQTT ne sert à rien ici : c'est du HTTP).
+3. Vue « Historique » (Swift Charts) : barres kWh/jour + totaux vie entière ; en repli, la
+   persistance locale des `EnergyCounters` (déjà au backlog) reste la solution sans cloud.
+
+### Sources
+
+- <https://github.com/RP-Develop/Zendure/blob/main/FHEM/ZendureUtils.pm> (requêtes complètes)
+- <https://github.com/Zendure/Zendure-HA/blob/master/custom_components/zendure_ha/api.py>
+- <https://github.com/bmachuletz/ZendureShell> (login PowerShell, mêmes endpoints)
+- <https://flarum-eu.zendure.tech/d/26660> (absence d'API officielle d'historique)
+
+---
+
 ## Recommandations d'implémentation pour le client Swift
 
 1. Écran de configuration demandant le **Cloud Key** (méthode 1), pas email/mot de passe.

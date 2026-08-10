@@ -172,6 +172,14 @@ private struct HeaderView: View {
             }
 
             Button {
+                openWindow(id: "history")
+            } label: {
+                Label("Historique", systemImage: "clock.arrow.circlepath")
+            }
+            .controlSize(.small)
+            .help("Énergie par jour (jusqu'à 365 jours) via l'API de l'app Zendure")
+
+            Button {
                 openWindow(id: "mqtt-console")
             } label: {
                 Label("Console MQTT", systemImage: "terminal")

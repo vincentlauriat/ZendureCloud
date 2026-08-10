@@ -21,6 +21,7 @@ Native macOS dashboard for the Zendure Cloud — connects to your Zendure accoun
 | Session energy counters (solar/home/grid/charge/discharge + roundtrip efficiency) | ✅ |
 | **Raw properties browser** — every key the cloud publishes, filterable | ✅ |
 | **MQTT console** — every raw frame in/out (all topics), filter, pause, pretty JSON | ✅ |
+| **Energy history** (up to 365 days, daily bars + lifetime totals) via the app-account API, local day cache | ✅ |
 | Menu bar extra (average SOC label + per-device dropdown) | ✅ |
 | Fallback poll `properties/read getAll` (configurable interval) | ✅ |
 | Auto-reconnect with full re-login on MQTT drop | ✅ |

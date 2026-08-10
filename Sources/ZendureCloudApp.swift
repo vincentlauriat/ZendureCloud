@@ -32,6 +32,15 @@ struct ZendureCloudApp: App {
             }
         }
 
+        Window("Historique", id: "history") {
+            HistoryView()
+                .environment(settings)
+                .environment(model)
+                .preferredColorScheme(settings.appearance.colorScheme)
+                .frame(minWidth: 640, minHeight: 420)
+        }
+        .defaultSize(width: 980, height: 680)
+
         Window("Console MQTT", id: "mqtt-console") {
             MQTTConsoleView()
                 .environment(settings)

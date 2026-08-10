@@ -34,6 +34,9 @@ final class AppModel {
     private static let mqttLogLimit = 500
 
     let settings: AppSettings
+    /// Historique d'énergie via l'API privée de l'app Zendure (chemin
+    /// d'auth séparé du Cloud Key).
+    let history = HistoryService()
     private let cloud = CloudService()
     private var started = false
 
