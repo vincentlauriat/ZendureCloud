@@ -32,6 +32,15 @@ struct ZendureCloudApp: App {
             }
         }
 
+        Window("Console MQTT", id: "mqtt-console") {
+            MQTTConsoleView()
+                .environment(settings)
+                .environment(model)
+                .preferredColorScheme(settings.appearance.colorScheme)
+                .frame(minWidth: 560, minHeight: 360)
+        }
+        .defaultSize(width: 860, height: 560)
+
         // Chaque scène ré-injecte l'environnement (les scènes ne le partagent
         // pas) et appelle model.start() en .onAppear — pattern MacInside.
         MenuBarExtra(isInserted: menuBarBinding) {

@@ -272,6 +272,31 @@ final class EnergyCountersTests: XCTestCase {
     }
 }
 
+final class MQTTLogEntryTests: XCTestCase {
+    private func entry(topic: String = "iot/pk/dk/properties/report", payload: String) -> MQTTLogEntry {
+        MQTTLogEntry(id: 1, date: Date(timeIntervalSince1970: 0), direction: .incoming,
+                     topic: topic, payload: payload)
+    }
+
+    func testSubTopicExtraction() {
+        XCTAssertEqual(entry(topic: "iot/pk/dk/properties/report", payload: "").subTopic, "properties/report")
+        XCTAssertEqual(entry(topic: "/pk/dk/firmware/report", payload: "").subTopic, "firmware/report")
+        XCTAssertNil(entry(topic: "trop/court", payload: "").subTopic)
+    }
+
+    func testPrettyPayloadFormatsJSON() {
+        let pretty = entry(payload: #"{"b":2,"a":1}"#).prettyPayload
+        XCTAssertNotNil(pretty)
+        // Clés triées et indentation : "a" apparaît avant "b", sur des lignes distinctes.
+        XCTAssertTrue(pretty!.contains("\n"))
+        XCTAssertLessThan(pretty!.range(of: "\"a\"")!.lowerBound, pretty!.range(of: "\"b\"")!.lowerBound)
+    }
+
+    func testPrettyPayloadNilForNonJSON() {
+        XCTAssertNil(entry(payload: "pas du json").prettyPayload)
+    }
+}
+
 final class MQTTCredentialsTests: XCTestCase {
     private func creds(_ url: String) -> MQTTCredentials {
         MQTTCredentials(clientId: "c", url: url, username: "u", password: "p")

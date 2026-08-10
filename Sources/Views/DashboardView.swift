@@ -155,6 +155,7 @@ private struct DeviceCardRef: Identifiable {
 /// toujours un âge, autant l'afficher — idée MacInside/WidgetTimestamp).
 private struct HeaderView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(spacing: 24) {
@@ -169,6 +170,14 @@ private struct HeaderView: View {
                 stat(label: "Solaire", value: Format.watts(model.totalSolarPower), color: .yellow)
                 stat(label: "Maison", value: Format.watts(model.totalHomePower), color: .blue)
             }
+
+            Button {
+                openWindow(id: "mqtt-console")
+            } label: {
+                Label("Console MQTT", systemImage: "terminal")
+            }
+            .controlSize(.small)
+            .help("Toutes les trames MQTT échangées avec le cloud, brutes")
         }
     }
 

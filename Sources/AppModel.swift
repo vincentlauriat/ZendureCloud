@@ -28,6 +28,11 @@ final class AppModel {
     private(set) var states: [String: DeviceState] = [:]
     private(set) var histories: [String: PowerHistory] = [:]
 
+    // Console MQTT — journal borné de toutes les trames (entrantes/sortantes).
+    private(set) var mqttLog: [MQTTLogEntry] = []
+    var mqttLogPaused = false
+    private static let mqttLogLimit = 500
+
     let settings: AppSettings
     private let cloud = CloudService()
     private var started = false
@@ -48,6 +53,17 @@ final class AppModel {
             history.append(state: state)
             self.histories[deviceKey] = history
         }
+        cloud.onMQTTLog = { [weak self] entry in
+            guard let self, !self.mqttLogPaused else { return }
+            self.mqttLog.append(entry)
+            if self.mqttLog.count > Self.mqttLogLimit {
+                self.mqttLog.removeFirst(self.mqttLog.count - Self.mqttLogLimit)
+            }
+        }
+    }
+
+    func clearMQTTLog() {
+        mqttLog = []
     }
 
     /// Idempotent — appelé en .onAppear de chaque scène pour garantir le
@@ -77,6 +93,7 @@ final class AppModel {
         devices = []
         states = [:]
         histories = [:]
+        mqttLog = []
     }
 
     var hasStoredCloudKey: Bool {

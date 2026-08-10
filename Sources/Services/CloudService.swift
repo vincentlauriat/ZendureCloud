@@ -26,6 +26,11 @@ final class CloudService: @unchecked Sendable {
     var onPhaseChanged: ((Phase) -> Void)?
     var onDevicesChanged: (([ZendureDevice]) -> Void)?
     var onStateChanged: ((_ deviceKey: String, _ state: DeviceState) -> Void)?
+    /// Chaque trame MQTT (entrante ou sortante), avant tout filtrage — pour
+    /// la console MQTT. Dispatché sur le main thread.
+    var onMQTTLog: ((MQTTLogEntry) -> Void)?
+
+    private var logCounter = 0
 
     private var mqtt: MQTTClient?
     private var pollTimer: DispatchSourceTimer?
@@ -163,7 +168,9 @@ final class CloudService: @unchecked Sendable {
                 "timestamp": Int(Date().timeIntervalSince1970),
             ]
             if let data = try? JSONSerialization.data(withJSONObject: payload) {
-                mqtt.publish(topic: "iot/\(device.productKey)/\(device.deviceKey)/properties/read", payload: data)
+                let topic = "iot/\(device.productKey)/\(device.deviceKey)/properties/read"
+                mqtt.publish(topic: topic, payload: data)
+                log(direction: .outgoing, topic: topic, payload: data)
             }
         }
     }
@@ -185,6 +192,8 @@ final class CloudService: @unchecked Sendable {
     // MARK: - Messages entrants
 
     private func handleMessage(topic: String, payload: Data) {
+        log(direction: .incoming, topic: topic, payload: payload)
+
         // Découpage en 4 segments max : marche pour `/pk/dk/sous/topic` (1er
         // segment vide) comme pour `iot/pk/dk/sous/topic`.
         let parts = topic.split(separator: "/", maxSplits: 3, omittingEmptySubsequences: false)
@@ -203,6 +212,22 @@ final class CloudService: @unchecked Sendable {
         }
         DispatchQueue.main.async { [weak self] in
             self?.onStateChanged?(deviceKey, updated)
+        }
+    }
+
+    private func log(direction: MQTTLogEntry.Direction, topic: String, payload: Data) {
+        let entry: MQTTLogEntry = stateQueue.sync {
+            logCounter += 1
+            return MQTTLogEntry(
+                id: logCounter,
+                date: Date(),
+                direction: direction,
+                topic: topic,
+                payload: String(decoding: payload, as: UTF8.self)
+            )
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.onMQTTLog?(entry)
         }
     }
 
